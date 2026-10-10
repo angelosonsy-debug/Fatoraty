@@ -1,0 +1,5 @@
+package com.angelosonsy.fatorty
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()

@@ -1,0 +1,137 @@
+name: Build فاتورتي APK
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      build_release:
+        description: "ابني نسخة release (APK غير موقّع) بدل debug"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: Analyze, test & build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java (required by Android Gradle Plugin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Flutter --version
+        run: flutter --version
+
+      # settings.gradle بيحتاج يقرأ "flutter.sdk" من الملف ده عشان يعرف مكان
+      # Flutter SDK على الجهاز. عادةً flutter_tools بيولّده تلقائي مع أول
+      # أمر زي "flutter pub get"، لكن بنعمله هنا يدوياً ومبكراً كـ fallback
+      # آمن، عشان أي خطوة تانية بعد كده (بما فيها أي تحقق من gradlew) متفشلش
+      # لو اتنفذت قبل ما flutter pub get يشتغل.
+      - name: Ensure android/local.properties exists
+        run: |
+          mkdir -p android
+          printf 'flutter.sdk=%s\n' "$FLUTTER_ROOT" > android/local.properties
+          cat android/local.properties
+
+      # المشروع اتبنى يدوياً من غير "flutter create"، فملفات Gradle Wrapper
+      # (gradlew, gradlew.bat, gradle-wrapper.jar) مش موجودة فعلياً في الـ repo
+      # (gradle-wrapper.jar ملف binary ومينفعش يتكتب كنص). الخطوة دي بتولّد
+      # الـ wrapper الكامل والصحيح وقت الـ CI باستخدام Gradle حقيقي.
+      #
+      # مهم: التوليد بيحصل في مجلد فاضي مؤقت (/tmp/wrapper-bootstrap) مش جوه
+      # android/ نفسها. السبب: أي أمر Gradle — حتى "gradle wrapper" — بيعمل
+      # تقييم (configure) كامل للمشروع الحالي الأول (settings.gradle +
+      # build.gradle + تطبيق AGP) قبل ما ينفّذ أي task. لو شغّلنا الأمر جوه
+      # android/ مباشرة، هيحصل تقييم للمشروع تحت نسخة Gradle النظام
+      # (system Gradle، غالباً حديثة جداً زي 9.x)، وAGP 8.x (اللي احنا
+      # بنستخدمه) مش متوافق مع Gradle 9.6+ (بيعتمد على internal API اتشالت)
+      # فالبناء بيفشل من وقت التوليد نفسه. بتوليد الـ wrapper في مجلد فاضي
+      # (مفيهوش settings.gradle/build.gradle للمشروع) بنتجنب المشكلة دي
+      # تماماً، وبعدين بننسخ الملفات الناتجة لمكانها الصح.
+      - name: Generate Gradle wrapper (pin to Flutter-compatible version)
+        run: |
+          set -e
+          GRADLE_PIN_VERSION="8.14"
+          if command -v gradle >/dev/null 2>&1; then
+            BOOTSTRAP_GRADLE="gradle"
+          else
+            echo "System Gradle غير موجود — بتحميل نسخة bootstrap مؤقتة..."
+            curl -sSL -o /tmp/gradle-bootstrap.zip \
+              "https://services.gradle.org/distributions/gradle-${GRADLE_PIN_VERSION}-bin.zip"
+            unzip -q /tmp/gradle-bootstrap.zip -d /tmp
+            BOOTSTRAP_GRADLE="/tmp/gradle-${GRADLE_PIN_VERSION}/bin/gradle"
+          fi
+
+          mkdir -p /tmp/wrapper-bootstrap
+          cd /tmp/wrapper-bootstrap
+          # لازم يكون فيه settings.gradle (ولو فاضي) عشان Gradle يعتبر
+          # المجلد ده "build" صالح وينفّذ عليه task "wrapper"
+          touch settings.gradle
+          "$BOOTSTRAP_GRADLE" wrapper --gradle-version "$GRADLE_PIN_VERSION" --distribution-type bin
+
+          cd "$GITHUB_WORKSPACE"
+          cp /tmp/wrapper-bootstrap/gradlew android/gradlew
+          cp /tmp/wrapper-bootstrap/gradlew.bat android/gradlew.bat
+          mkdir -p android/gradle/wrapper
+          cp /tmp/wrapper-bootstrap/gradle/wrapper/gradle-wrapper.jar android/gradle/wrapper/gradle-wrapper.jar
+          cp /tmp/wrapper-bootstrap/gradle/wrapper/gradle-wrapper.properties android/gradle/wrapper/gradle-wrapper.properties
+          chmod +x android/gradlew
+          # ملاحظة: متعملش "./gradlew --version" هنا — settings.gradle بيحتاج
+          # android/local.properties (بيتولّد لاحقاً مع "flutter pub get")
+          # عشان يعرف مكان Flutter SDK. التحقق الفعلي من الـ wrapper هيحصل
+          # تلقائياً أول ما "flutter build apk" يشغّل Gradle بنفسه.
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed . || true
+        # تحذير فقط وليس فشل للبناء — شيل "|| true" لو عايز تفعيلها كبوابة صارمة
+
+      - name: Analyze project source
+        run: flutter analyze
+
+      - name: Run unit tests
+        run: flutter test
+
+      # --split-per-abi بيطلّع APK منفصل لكل معمارية (arm64-v8a،
+      # armeabi-v7a، x86_64) بدل APK "شامل" واحد فيه نسخ libflutter.so لكل
+      # المعماريات مع بعض. ده بيقلل حجم كل ملف يتحمّل فعلياً بشكل كبير —
+      # معظم الموبايلات الحديثة arm64-v8a بس. (حجم الـ debug kernel/JIT
+      # نفسه، مش الـ native libs، هيفضل أكبر من الـ release الطبيعي —
+      # ده طبيعي وبيحصل في كل تطبيقات Flutter في وضع debug، ومش عيب في
+      # الكود. لحجم نهائي واقعي يعكس اللي هيوصل للمستخدمين، استخدم
+      # "Build release APK" من workflow_dispatch بدل الافتراضي.)
+      - name: Build debug APK (split per ABI)
+        if: ${{ github.event.inputs.build_release != 'true' }}
+        run: flutter build apk --debug --split-per-abi
+
+      - name: Build release APK (unsigned, split per ABI)
+        if: ${{ github.event.inputs.build_release == 'true' }}
+        run: flutter build apk --release --split-per-abi
+        # ملاحظة: الـ release APK هنا غير موقّع بمفتاح إنتاج حقيقي؛
+        # android/app/build.gradle مضبوط مؤقتاً على استخدام مفتاح الـ debug
+        # عشان الـ CI يقدر يبني بدون أسرار. لازم تضيف Release Keystore
+        # حقيقي (عبر GitHub Secrets) قبل النشر الفعلي على Google Play.
+
+      - name: Upload APK artifacts (all ABIs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: fatorty-apk
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 14
