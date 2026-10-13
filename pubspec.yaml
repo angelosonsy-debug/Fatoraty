@@ -1,0 +1,66 @@
+name: fatorty
+description: "فاتورتي - تذكير تلقائي بمواعيد سداد الفواتير"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  # State management
+  provider: ^6.1.2
+
+  # Local storage (JSON via shared_preferences — consistent with Mahfazty)
+  shared_preferences: ^2.2.3
+
+  # Notifications + scheduling
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.4
+
+  # App info / utility
+  package_info_plus: ^8.0.0
+  url_launcher: ^6.3.0
+  share_plus: ^10.0.0
+  in_app_review: ^2.0.9
+  uuid: ^4.4.0
+  # ملاحظة: ملناش "intl" هنا رغم إن flutter_localizations بيعتمد عليه —
+  # وده مقصود. intl مش مستخدم في أي كود عندنا فعلياً، وflutter_localizations
+  # (من الـ SDK) بيجيب نسخة intl المتوافقة تلقائياً كـ transitive dependency.
+  # تثبيت نسخة صريحة هنا هو اللي كان بيسبب تعارض (version solving failed)
+  # كل ما Flutter SDK يتحدّث ويطلب نسخة intl أحدث. لو احتجنا intl فعلياً
+  # (مثلاً لتنسيق تاريخ/عملة)، نضيفه وقتها بـ: flutter pub add intl
+
+  # Monetization (classes وبنية الكود جاهزة بالفعل في PremiumProvider، لكن
+  # الباكدج نفسه لسه مش مستورد في أي كود — هيتضاف وقت التفعيل الفعلي لـ
+  # AdMob (مهمة منفصلة لاحقة بعد توفر Ad Unit IDs حقيقية) بـ:
+  # flutter pub add google_mobile_ads
+  # تركه مُعلن من غير استخدام بيزوّد احتمال تعارض نسخ مستقبلي من غير أي فايدة
+  # حالية.
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icon/
+
+# Run: flutter pub run flutter_launcher_icons
+# TODO: استبدل assets/icon/icon.png بأيقونة حقيقية (1024x1024) قبل أول نشر
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/icon/icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#2563EB"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"

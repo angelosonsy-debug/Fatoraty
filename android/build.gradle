@@ -1,0 +1,22 @@
+// ملاحظة: نسخة AGP/Kotlin بتتحدد مركزياً من android/settings.gradle
+// (plugins {} block) — مفيش داعي لتكرارها هنا بالصيغة القديمة
+// (buildscript/classpath)، وده كان بيعمل تعارض محتمل في نسخة الأدوات.
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = '../build'
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(':app')
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
