@@ -1,0 +1,30 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+# ملاحظة: متعمّدين مانعملش ignore لـ pubspec.lock. استبعاده كان بيخلي
+# flutter pub get يحل لأحدث نسخة متوافقة في كل مرة بدل نسخة ثابتة —
+# وده بالظبط سبب أكتر من مشكلة build واجهناها (زي تعارض intl) كانت
+# ممكن تتجنّب لو كان فيه ملف قفل محفوظ. أول "flutter pub get" ناجح
+# هيولّد pubspec.lock؛ لازم يتعمله commit ويفضل متابَع في الريبو.
+
+# Android
+android/local.properties
+android/key.properties
+android/**/gradle-wrapper.jar
+android/.gradle
+android/captures/
+android/app/*.jks
+android/app/*.keystore
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store

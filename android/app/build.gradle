@@ -1,0 +1,84 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0.0'
+}
+
+android {
+    namespace "com.angelosonsy.fatorty"
+    compileSdk flutter.compileSdkVersion
+    ndkVersion flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        // مطلوب لأن flutter_local_notifications محتاج core library
+        // desugaring (Android 13+ APIs زي java.time مثلاً) شغّال
+        coreLibraryDesugaringEnabled true
+    }
+
+    kotlinOptions {
+        // String مش JavaVersion — ده النوع الصح اللي kotlinOptions.jvmTarget
+        // بيستناه فعلياً
+        jvmTarget = "17"
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        applicationId "com.angelosonsy.fatorty"
+        minSdkVersion 23
+        targetSdkVersion flutter.targetSdkVersion
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+        multiDexEnabled true
+    }
+
+    buildTypes {
+        release {
+            // TODO: وقّع بمفتاح Release حقيقي قبل أول نشر على Play Store
+            // (حالياً بيستخدم مفتاح debug عشان CI يقدر يبني بدون أسرار)
+            signingConfig signingConfigs.debug
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            applicationIdSuffix ".debug"
+        }
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+dependencies {
+    // ملاحظة: مفيش داعي لإضافة kotlin-stdlib صراحة — الـ Kotlin Android
+    // Gradle plugin (مُفعّل فوق في plugins{}) بيضيفه تلقائياً.
+    // مطلوبة بسبب coreLibraryDesugaringEnabled فوق (flutter_local_notifications)
+    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"
+    implementation "androidx.multidex:multidex:2.0.1"
+    implementation "androidx.window:window:1.2.0"
+    implementation "androidx.window:window-java:1.2.0"
+}
