@@ -1,0 +1,61 @@
+// ملاحظة: نسخة AGP/Kotlin بتتحدد مركزياً من android/settings.gradle
+// (plugins {} block) — مفيش داعي لتكرارها هنا بالصيغة القديمة
+// (buildscript/classpath)، وده كان بيعمل تعارض محتمل في نسخة الأدوات.
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = '../build'
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+
+// كل بلجن فلاتر (file_picker, home_widget, share_plus...) بيبقى عنده
+// subproject Gradle خاص بيه وله compileSdk مستقل خالص عن compileSdk
+// بتاع :app (المضبوط صراحة على 36 في app/build.gradle). رفع compileSdk
+// بتاع :app لوحده ما بيأثرش على موديولات البلجنز دي، وده بالظبط سبب
+// استمرار خطأ ":file_picker is currently compiled against android-34"
+// حتى بعد رفع compileSdk بتاع :app نفسه.
+//
+// بدل ما نلحق كل بلجن لوحده (وده هيحتاج نرفع كل نسخة لأحدث إصدار، وممكن
+// بعضها يكون فيه تغييرات API كاسرة زي file_picker 12.x)، بنفرض compileSdk
+// 36 كحد أدنى على كل subproject بتاع أندرويد من هنا مركزياً — نفس الحل
+// اللي مجتمع فلاتر بيستخدمه لما بلجن قديم بيبقى أقل من اللي اعتمادياته
+// محتاجاه. بنرفع بس (مش بننزل) لو البلجن أصلاً طالب رقم أعلى من 36.
+//
+// مهم: الـ block ده لازم يتسجّل هنا، قبل "evaluationDependsOn(':app')" تحت
+// — لأن الأمر ده بيجبر Gradle يقيّم :app فورًا في نفس اللحظة دي (قبل أي
+// حاجة بعده في الملف). لو afterEvaluate() بتاعنا كان متسجّل بعد الأمر ده،
+// :app يبقى خلاص اتقيّم وقت ما نوصله، وGradle بيرفض يسجّل afterEvaluate
+// جديد على مشروع خلص تقييمه بالفعل — وده بالظبط سبب الخطأ اللي ظهر
+// ("Cannot run Project.afterEvaluate(Closure) when the project is
+// already evaluated").
+subprojects { proj ->
+    proj.afterEvaluate {
+        if (proj.hasProperty('android')) {
+            def current = proj.android.compileSdkVersion
+            def currentApi = 0
+            if (current != null) {
+                def digits = current.toString().replaceAll('[^0-9]', '')
+                if (digits.length() > 0) {
+                    currentApi = digits.toInteger()
+                }
+            }
+            if (currentApi < 36) {
+                proj.android.compileSdk = 36
+            }
+        }
+    }
+}
+
+subprojects {
+    project.evaluationDependsOn(':app')
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}

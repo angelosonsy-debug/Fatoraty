@@ -1,0 +1,37 @@
+pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        file("local.properties").withInputStream { properties.load(it) }
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        return flutterSdkPath
+    }()
+
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    // ملحوظة تاريخية: رفعنا الأول لـ AGP 9.1.0 + Gradle 9.3.1 (أقل إصدارين
+    // متوافقين مع بعض)، لكن Flutter 3.50 طلب فعلياً AGP >= 9.1.1 (مش 9.1.0)
+    // وحذّر كمان إن دعم Gradle 9.3.1 "هيتشال قريب" لصالح 9.5.0+. فبدل ما
+    // نلحق كل حد فحد في جولة تانية، رفعنا على طول لـ AGP 9.3 مع Gradle 9.5.0
+    // (نفس القيمة في gradle-wrapper.properties و .github/workflows/build.yml)
+    // لأن ده الزوج المتوافق الرسمي حاليًا (9.5.0 = أقل إصدار ومُفترَض افتراضيًا
+    // لـ AGP 9.3 حسب جدول توافق Google نفسه).
+    id "com.android.application" version "9.3.3" apply false
+    // AGP 9.3.3 بقى عنده اعتمادية داخلية (runtime) على KGP 2.4.10 — يعني
+    // بيرفع نسخة Kotlin الفعلية لـ 2.4.10 أتوماتيك وقت البيلد بغض النظر عن
+    // رقمنا هنا (ده اللي كان بيظهر في التحذير كـ "نسختك الفعلية 2.4.10").
+    // فبنعلن عن رقم ≥ 2.4.20 صراحة هنا (بدل 2.2.20 القديمة) عشان الرقم
+    // المعلن يطابق الواقع ونقفل التحذير بتاع فلاتر.
+    id "org.jetbrains.kotlin.android" version "2.4.20" apply false
+}
+
+include ":app"
